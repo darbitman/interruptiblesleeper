@@ -1,38 +1,35 @@
 #pragma once
 
-#include <atomic>
-#include <chrono>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
 class InterruptibleSleeper {
  public:
-  /// \brief Returns true if this slept for the time given. Otherwise, returns false if woken up prematurely.
+  InterruptibleSleeper() : m_locker(m_mtx) {}
+
+  /// \brief This call blocks until either it returns true if this slept for the time given, or it will return false if
+  /// woken up prematurely.
   template <class ChronoDuration>
   bool trySleepFor(ChronoDuration time) {
-    m_timed_locker.lock();
-    m_sleeping.store(true, std::memory_order_release);
-
-    const bool sleptTilEnd = !m_timed_locker.try_lock_for(time);
-    // In the case that wake() wasn't called, the mutex will fail to lock (ie. try_lock timed out), then it slept
-    // successfully, and it means it's still locked.
-    // In the case wake() was called, the mutex will lock, (ie. try_lock succeeded).
-    // In both cases, woken up or timed out, the lock is still locked at this point, so it needs to be unlocked.
-    m_sleeping.store(false, std::memory_order_release);
-    m_timed_locker.unlock();
-    return sleptTilEnd;
+    // if we're here and wake() is called, then wake() will block since it's waiting to acquire the lock. wait_for()
+    // will atomically release the lock and block, at which point wake() will acquire the lock and immeidately wake up
+    // and notify the cv to continue.
+    return m_cv.wait_for(m_locker, time) == std::cv_status::timeout;
   }
 
-  bool wake() {
-    if (m_sleeping.load(std::memory_order::memory_order_acquire)) {
-      m_timed_locker.unlock();
-      m_sleeping.store(false, std::memory_order_release);
-      return true;
-    }
-    return false;
+  /// \brief Wake up the sleeping thread if it is currently sleeping. This call blocks until the other thread has fallen
+  /// asleep. In other words, this will block if the other thread is in the middle of processing. This way, next time it
+  /// falls asleep, it will wake up immediately.
+  void wake() {
+    // if the cv is not currently waiting, then the lock has been acquired by it. This call will block until the next
+    // time wait_for() unlocks. At that point it will acquire the lock.
+    std::unique_lock<std::mutex> locker(m_mtx);
+    m_cv.notify_one();
   }
 
  private:
-  std::atomic_bool m_sleeping;
-  std::timed_mutex m_timed_locker;
+  std::mutex                   m_mtx;
+  std::unique_lock<std::mutex> m_locker;
+  std::condition_variable      m_cv;
 };

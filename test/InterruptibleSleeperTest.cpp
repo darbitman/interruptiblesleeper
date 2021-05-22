@@ -6,15 +6,15 @@ InterruptibleSleeper sleeper;
 
 void process() {
   while (true) {
-    if (sleeper.trySleepFor(std::chrono::seconds(1))) {
+    if (sleeper.trySleepFor(std::chrono::milliseconds(1000))) {
       std::cout << "Timeout: "
-                << std::chrono::duration_cast<std::chrono::seconds>(
+                << std::chrono::duration_cast<std::chrono::milliseconds>(
                        std::chrono::high_resolution_clock::now().time_since_epoch())
                        .count()
                 << '\n';
     } else {
       std::cout << "Woke up: "
-                << std::chrono::duration_cast<std::chrono::seconds>(
+                << std::chrono::duration_cast<std::chrono::milliseconds>(
                        std::chrono::high_resolution_clock::now().time_since_epoch())
                        .count()
                 << '\n';
