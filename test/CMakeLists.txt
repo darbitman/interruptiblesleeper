@@ -1,0 +1,3 @@
+add_executable(InterruptibleSleeperTest InterruptibleSleeperTest.cpp)
+target_include_directories(InterruptibleSleeperTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(InterruptibleSleeperTest PRIVATE pthread)
